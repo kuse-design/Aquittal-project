@@ -102,11 +102,11 @@
   --border: #ffffff24;
   --input: #ffffff2e;
   --ring: #c9a227;
-  --chart-1: var(--color-blue-300);
-  --chart-2: var(--color-blue-500);
-  --chart-3: var(--color-blue-600);
-  --chart-4: var(--color-blue-700);
-  --chart-5: var(--color-blue-800);
+  --chart-1: #c9a227;
+  --chart-2: #8a6d1b;
+  --chart-3: #b9b3a4;
+  --chart-4: #080808;
+  --chart-5: #f7f5ef;
   --sidebar: #171613;
   --sidebar-foreground: #f7f5ef;
   --sidebar-accent: #222018;

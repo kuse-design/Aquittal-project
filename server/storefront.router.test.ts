@@ -38,7 +38,7 @@ function makeUser(role: "admin" | "user"): AuthenticatedUser {
     openId: "sample-user",
     email: "sample@example.com",
     name: "Sample User",
-    loginMethod: "manus",
+    loginMethod: "email",
     role,
     createdAt: new Date(),
     updatedAt: new Date(),
