@@ -48,20 +48,28 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath =
-    process.env.NODE_ENV === "development"
-      ? path.resolve(import.meta.dirname, "../..", "dist", "public")
-      : path.resolve(import.meta.dirname, "public");
-  if (!fs.existsSync(distPath)) {
-    console.error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
-    );
+  const isVercel = !!process.env.VERCEL;
+  const projectRoot = path.resolve(import.meta.dirname, "..", "..");
+
+  if (!isVercel) {
+    const distPath = path.resolve(projectRoot, "dist", "public");
+    if (!fs.existsSync(distPath)) {
+      console.error(
+        `Could not find the build directory: ${distPath}, make sure to build the client first`
+      );
+    }
+
+    app.use(express.static(distPath));
   }
 
-  app.use(express.static(distPath));
-
-  // fall through to index.html if the file doesn't exist
+  // fall through to index.html if the file doesn't exist (SPA fallback)
+  // On Vercel, this only runs for non-static routes (API routes are handled by the function)
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    const indexPath = path.resolve(projectRoot, "dist", "public", "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Not found");
+    }
   });
 }
