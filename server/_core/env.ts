@@ -5,6 +5,12 @@ export const ENV = {
   // OpenAI-compatible API (OpenAI, Azure, local, etc.)
   forgeApiUrl: process.env.OPENAI_API_URL ?? "",
   forgeApiKey: process.env.OPENAI_API_KEY ?? "",
+  // SMTP for order emails
+  smtpHost: process.env.SMTP_HOST ?? "",
+  smtpPort: process.env.SMTP_PORT ?? "",
+  smtpUser: process.env.SMTP_USER ?? "",
+  smtpPass: process.env.SMTP_PASS ?? "",
+  smtpFrom: process.env.SMTP_FROM ?? "",
   // S3-compatible storage (R2, MinIO, AWS S3, etc.)
   s3Endpoint: process.env.S3_ENDPOINT ?? "",
   s3Region: process.env.S3_REGION ?? "auto",

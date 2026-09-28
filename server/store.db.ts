@@ -10,6 +10,8 @@ import type {
   StoreProduct,
 } from "../shared/store";
 import { getDb } from "./db";
+// @ts-ignore - email module depends on nodemailer which may not be installed yet
+import { sendEmail, generateAdminOrderEmail, generateCustomerConfirmationEmail, getEmailConfig, type EmailConfig } from "./_core/email";
 
 function requireDb() {
   return getDb().then(db => {
@@ -246,6 +248,27 @@ export async function submitStoreOrder(input: CreateOrderInput) {
     if (!savedOrder) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The order could not be confirmed." });
     await tx.insert(orderItems).values(orderLines.map(line => ({ ...line, orderId: savedOrder.id })));
   });
+
+  // Send emails after transaction commits
+  const orderForEmail = {
+    orderNumber,
+    customerName: input.customerName.trim(),
+    customerEmail: input.customerEmail?.trim() || null,
+    customerPhone: input.customerPhone.trim(),
+    customerNote: input.customerNote?.trim() || null,
+    total: minorToPrice(totalMinor),
+    currencyCode,
+    items: orderLines,
+    createdAt: now,
+  };
+
+  // Fire-and-forget: don't block the response
+  const adminEmail = generateAdminOrderEmail(orderForEmail);
+  sendEmail(getEmailConfig()?.user ?? "", adminEmail.subject, adminEmail.html).catch(console.error);
+  if (orderForEmail.customerEmail) {
+    const customerEmail = generateCustomerConfirmationEmail(orderForEmail);
+    sendEmail(orderForEmail.customerEmail, customerEmail.subject, customerEmail.html).catch(console.error);
+  }
 
   return { orderNumber, total: minorToPrice(totalMinor), currencyCode, createdAt: now };
 }
