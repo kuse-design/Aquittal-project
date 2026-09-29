@@ -196,7 +196,9 @@ button, a, select { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, select:focus-visible { outline: 2px solid var(--gold-deep); outline-offset: 4px; }
 ::selection { color: var(--ink); background: #e8d79d; }
 
-.storefront { min-height: 100vh; overflow: hidden; background: var(--paper); color: var(--ink); }
+/* overflow-x: clip (not hidden) still contains the marquee and hero stamp, but does
+   not create a scroll container, which would silently disable the sticky header. */
+.storefront { min-height: 100vh; overflow-x: clip; background: var(--paper); color: var(--ink); }
 .announcement-bar { min-height: 36px; padding: 0 6.3vw; display: flex; align-items: center; gap: 12px; background: var(--ink); color: var(--paper); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
 .announcement-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
 .announcement-bar a { margin-left: auto; display: inline-flex; align-items: center; gap: 9px; color: var(--paper); text-decoration: none; transition: color .18s ease-out; }
