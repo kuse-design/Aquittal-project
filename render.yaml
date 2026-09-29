@@ -1,0 +1,46 @@
+# Render blueprint for the clothing storefront.
+#
+# Deploy: push this repo to GitHub, then in Render choose "New +" -> "Blueprint"
+# and select the repository. Render provisions Postgres, injects DATABASE_URL
+# into the web service, and builds/deploys the app.
+#
+# Manual step: fill in the CLOUDINARY_* values in the service's Environment tab.
+#
+# NOTE: the free Postgres plan is deleted after 30 days. For data that must
+# persist beyond that, switch `storefront-db` to the `starter` plan.
+
+databases:
+  - name: storefront-db
+    databaseName: storefront
+    plan: free
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: storefront
+    runtime: node
+    plan: free
+    region: oregon
+    # Migrations run here rather than as a preDeployCommand because that
+    # feature requires a paid plan. drizzle-kit is a devDependency, which is
+    # fine because the start command runs in the same container as the build.
+    startCommand: pnpm run db:migrate && NODE_ENV=production pnpm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Major-only pin so Render resolves the latest 24.x (matches local dev).
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: storefront-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # Images — set these from your Cloudinary account in the Render dashboard.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false

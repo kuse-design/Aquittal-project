@@ -1,7 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc";
+import { router, publicProcedure } from "../_core/trpc";
 import { hashPassword, verifyPassword, createSessionToken, getSessionCookieOptions } from "../_core/auth";
+import type { User } from "../../shared/types";
 import * as db from "../db";
 
 const loginInput = z.object({
@@ -15,9 +16,19 @@ const registerInput = z.object({
   name: z.string().trim().min(2).max(180).optional(),
 });
 
+/** Only these fields ever leave the server. Never return `passwordHash`. */
+function toSafeUser(user: User) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+  };
+}
+
 export const authRouter = router({
   me: publicProcedure.query(async ({ ctx }) => {
-    return ctx.user;
+    return ctx.user ? toSafeUser(ctx.user) : null;
   }),
 
   login: publicProcedure.input(loginInput).mutation(async ({ input, ctx }) => {
@@ -40,7 +51,7 @@ export const authRouter = router({
     const cookieOptions = getSessionCookieOptions(ctx.req);
     ctx.res.cookie("app_session_id", sessionToken, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
 
-    return { user: { id: user.id, email: user.email, name: user.name, role: user.role } };
+    return { user: toSafeUser(user) };
   }),
 
   register: publicProcedure.input(registerInput).mutation(async ({ input, ctx }) => {
@@ -75,7 +86,7 @@ export const authRouter = router({
     const cookieOptions = getSessionCookieOptions(ctx.req);
     ctx.res.cookie("app_session_id", sessionToken, { ...cookieOptions, maxAge: 365 * 24 * 60 * 60 * 1000 });
 
-    return { user: { id: user.id, email: user.email, name: user.name, role: user.role } };
+    return { user: toSafeUser(user) };
   }),
 
   logout: publicProcedure.mutation(({ ctx }) => {

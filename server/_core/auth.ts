@@ -13,13 +13,17 @@ export type SessionPayload = {
   role: string;
 };
 
+// Pure-JS bcrypt: avoids a native build step, which is unreliable on
+// serverless/container build images. Cost 12 keeps existing hashes valid.
+const BCRYPT_COST = 12;
+
 export async function hashPassword(password: string): Promise<string> {
-  const bcrypt = await import("bcrypt");
-  return bcrypt.hash(password, 12);
+  const bcrypt = await import("bcryptjs");
+  return bcrypt.hash(password, BCRYPT_COST);
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  const bcrypt = await import("bcrypt");
+  const bcrypt = await import("bcryptjs");
   return bcrypt.compare(password, hash);
 }
 

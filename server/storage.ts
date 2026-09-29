@@ -1,103 +1,100 @@
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { ENV } from "./_core/env";
+import { v2 as cloudinary } from "cloudinary";
 import { nanoid } from "nanoid";
+import { ENV } from "./_core/env";
 
-function getS3Config() {
-  const endpoint = ENV.s3Endpoint;
-  const region = ENV.s3Region;
-  const accessKeyId = ENV.s3AccessKeyId;
-  const secretAccessKey = ENV.s3SecretAccessKey;
-  const bucket = ENV.s3Bucket;
+/**
+ * Image storage backed by Cloudinary.
+ *
+ * `storageKey` values look like "store-products/<id>.<format>" so they round-trip
+ * through storageGet/storageDelete without an extra database lookup.
+ */
 
-  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
+let configured = false;
+
+function getConfig() {
+  const { cloudName, apiKey, apiSecret } = ENV;
+  if (!cloudName || !apiKey || !apiSecret) {
     throw new Error(
-      "Storage config missing: set S3_ENDPOINT, S3_REGION, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_BUCKET",
+      "Storage config missing: set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET",
     );
   }
-
-  return { endpoint, region, accessKeyId, secretAccessKey, bucket };
-}
-
-function getS3Client() {
-  const { endpoint, region, accessKeyId, secretAccessKey } = getS3Config();
-  return new S3Client({
-    endpoint,
-    region,
-    credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true,
-  });
-}
-
-function getPublicUrl(key: string): string {
-  const { bucket } = getS3Config();
-  const publicUrl = ENV.s3PublicUrl;
-  if (publicUrl) {
-    return `${publicUrl.replace(/\/+$/, "")}/${key}`;
+  if (!configured) {
+    cloudinary.config({ cloud_name: cloudName, api_key: apiKey, api_secret: apiSecret, secure: true });
+    configured = true;
   }
-  return `/api/storage/${key}`;
 }
 
 function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
 }
 
-function appendHashSuffix(relKey: string): string {
-  const hash = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
-  const lastDot = relKey.lastIndexOf(".");
-  if (lastDot === -1) return `${relKey}_${hash}`;
-  return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
+/** Splits "store-products/abc.webp" into the Cloudinary public id and format. */
+function splitKey(relKey: string): { publicId: string; format?: string } {
+  const key = normalizeKey(relKey);
+  const lastDot = key.lastIndexOf(".");
+  const lastSlash = key.lastIndexOf("/");
+  if (lastDot > lastSlash + 1) {
+    return { publicId: key.slice(0, lastDot), format: key.slice(lastDot + 1) };
+  }
+  return { publicId: key };
 }
+
+function withUniqueSuffix(relKey: string): string {
+  const hash = nanoid(8).toLowerCase();
+  const { publicId, format } = splitKey(relKey);
+  return format ? `${publicId}_${hash}.${format}` : `${publicId}_${hash}`;
+}
+
+const CONTENT_TYPE_FORMATS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/avif": "avif",
+  "image/gif": "gif",
+};
 
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream",
 ): Promise<{ key: string; url: string }> {
-  const { bucket } = getS3Config();
-  const key = appendHashSuffix(normalizeKey(relKey));
-  const client = getS3Client();
+  getConfig();
 
-  const blob =
-    typeof data === "string"
-      ? Buffer.from(data)
-      : Buffer.from(data as Uint8Array);
+  const { publicId } = splitKey(withUniqueSuffix(relKey));
+  const format = CONTENT_TYPE_FORMATS[contentType];
+  const blob = typeof data === "string" ? Buffer.from(data) : Buffer.from(data as Uint8Array);
+  const payload = `data:${contentType};base64,${blob.toString("base64")}`;
 
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: blob,
-      ContentType: contentType,
+  const uploaded = await cloudinary.uploader.upload(payload, {
+    public_id: publicId,
+    resource_type: "image",
+    ...(format ? { format } : {}),
+    overwrite: false,
+    invalidate: true,
+  });
+
+  const storedFormat = uploaded.format ?? format;
+  return {
+    key: storedFormat ? `${publicId}.${storedFormat}` : publicId,
+    url: uploaded.secure_url,
+  };
+}
+
+export function storageGet(relKey: string): { key: string; url: string } {
+  getConfig();
+  const { publicId, format } = splitKey(relKey);
+  return {
+    key: normalizeKey(relKey),
+    url: cloudinary.url(publicId, {
+      resource_type: "image",
+      secure: true,
+      ...(format ? { format } : {}),
     }),
-  );
-
-  return { key, url: getPublicUrl(key) };
-}
-
-export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
-  const key = normalizeKey(relKey);
-  return { key, url: getPublicUrl(key) };
-}
-
-export async function storageGetSignedUrl(relKey: string, expiresIn = 3600): Promise<string> {
-  const { bucket } = getS3Config();
-  const key = normalizeKey(relKey);
-  const client = getS3Client();
-
-  const command = new GetObjectCommand({ Bucket: bucket, Key: key });
-  return getSignedUrl(client, command, { expiresIn });
+  };
 }
 
 export async function storageDelete(relKey: string): Promise<void> {
-  const { bucket } = getS3Config();
-  const key = normalizeKey(relKey);
-  const client = getS3Client();
-
-  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+  getConfig();
+  const { publicId } = splitKey(relKey);
+  await cloudinary.uploader.destroy(publicId, { resource_type: "image", invalidate: true });
 }

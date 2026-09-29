@@ -8,8 +8,14 @@ if (!connectionString) {
 export default defineConfig({
   schema: "./drizzle/schema.ts",
   out: "./drizzle",
-  dialect: "mysql",
+  dialect: "postgresql",
   dbCredentials: {
     url: connectionString,
+  },
+  // Render injects a pooled connection string in production; keep the
+  // migration client from exhausting the pool during `drizzle-kit migrate`.
+  migrations: {
+    table: "__drizzle_migrations",
+    schema: "public",
   },
 });
