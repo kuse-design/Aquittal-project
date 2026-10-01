@@ -16,12 +16,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
+  SidebarSeparator,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { startLogin } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LogOut, Package, PanelLeft, ShoppingBag } from "lucide-react";
+import { ArrowUpRight, LogOut, Package, PanelLeft, ShoppingBag, Store } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
@@ -31,6 +32,9 @@ const menuItems = [
   { icon: Package, label: "Products", path: "/admin" },
   { icon: ShoppingBag, label: "Orders", path: "/admin/orders" },
 ];
+
+const STOREFRONT_HREF = "/";
+const STOREFRONT_LABEL = "View storefront";
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
@@ -200,6 +204,27 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           <SidebarFooter className="p-3">
+            {/* Plain anchor: a full page load swaps the studio shell for the
+                storefront shell and re-reads the catalog instead of reusing
+                the admin query cache. */}
+            <SidebarMenu className="mb-1">
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={STOREFRONT_LABEL}
+                  className="h-10 font-normal text-muted-foreground hover:text-foreground"
+                >
+                  <a href={STOREFRONT_HREF}>
+                    <Store />
+                    <span>{STOREFRONT_LABEL}</span>
+                    <ArrowUpRight className="ml-auto opacity-60 group-data-[collapsible=icon]:hidden" />
+                  </a>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+
+            <SidebarSeparator className="mx-0 mb-2" />
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -253,6 +278,13 @@ function DashboardLayoutContent({
                 </div>
               </div>
             </div>
+            <a
+              href={STOREFRONT_HREF}
+              className="flex h-9 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-sm font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              <Store className="size-4 shrink-0" />
+              Store
+            </a>
           </div>
         )}
         <main className="flex-1 p-4">{children}</main>
